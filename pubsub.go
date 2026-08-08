@@ -89,7 +89,7 @@ func (p *Pubsub) RegisterHandlers(handlers ...Handler) error {
 			return err
 		}
 
-		go func(consumer *rmq.Consumer) {
+		go func(consumer *rmq.Consumer, handler Handler) {
 			defer consumer.Close(context.Background())
 
 			for {
@@ -116,7 +116,7 @@ func (p *Pubsub) RegisterHandlers(handlers ...Handler) error {
 
 				delivery.Accept(p.ctx)
 			}
-		}(consumer)
+		}(consumer, handler)
 	}
 	return nil
 }
