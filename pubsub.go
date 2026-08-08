@@ -150,6 +150,6 @@ func (p *Pubsub) Dispatch(event Event) error {
 }
 
 func (p *Pubsub) Close() {
-	_ = p.conn.Close(context.Background())
 	_ = p.bus.Close(context.Background())
+	_ = p.conn.Close(context.Background())
 }
