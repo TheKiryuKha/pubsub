@@ -39,6 +39,14 @@ func New(ctx context.Context, address string) (*Pubsub, error) {
 		return &Pubsub{}, err
 	}
 
+	_, err = conn.Management().DeclareExchange(
+		ctx,
+		&rmq.DirectExchangeSpecification{Name: ExchangeName},
+	)
+	if err != nil {
+		return &Pubsub{}, err
+	}
+
 	return &Pubsub{conn: conn, ctx: ctx}, nil
 }
 
@@ -50,14 +58,6 @@ This thing should:
 - register recievers as handlers(idk, LOL)
 */
 func (p *Pubsub) RegisterHandlers(handlers ...Handler) error {
-	_, err := p.conn.Management().DeclareExchange(
-		p.ctx,
-		&rmq.DirectExchangeSpecification{Name: ExchangeName},
-	)
-	if err != nil {
-		return err
-	}
-
 	for _, handler := range handlers {
 		qInfo, err := p.conn.Management().DeclareQueue(
 			p.ctx,
