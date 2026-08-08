@@ -2,6 +2,7 @@ package pubsub
 
 import (
 	"context"
+	"fmt"
 
 	rmq "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmqamqp"
 )
@@ -17,11 +18,13 @@ defer pub.Close()
 - publisher.Close()
 */
 type Pubsub struct {
-	conn *rmq.AmqpConnection
 	ctx  context.Context
+	conn *rmq.AmqpConnection
+	bus  *rmq.Publisher
 }
 
 type Event struct {
+	Type    string
 	Message string
 }
 
@@ -47,7 +50,12 @@ func New(ctx context.Context, address string) (*Pubsub, error) {
 		return &Pubsub{}, err
 	}
 
-	return &Pubsub{conn: conn, ctx: ctx}, nil
+	publisher, err := conn.NewPublisher(ctx, nil, nil)
+	if err != nil {
+		return &Pubsub{}, err
+	}
+
+	return &Pubsub{ctx: ctx, conn: conn, bus: publisher}, nil
 }
 
 /*
@@ -78,5 +86,28 @@ func (p *Pubsub) RegisterHandlers(handlers ...Handler) error {
 			}
 		}
 	}
+	return nil
+}
+
+func (p *Pubsub) Dispatch(event Event) error {
+	msg, err := rmq.NewMessageWithAddress(
+		[]byte(event.Message),
+		&rmq.ExchangeAddress{Exchange: ExchangeName, Key: event.Type},
+	)
+	if err != nil {
+		return err
+	}
+
+	res, err := p.bus.Publish(p.ctx, msg)
+	if err != nil {
+		return err
+	}
+
+	switch res.Outcome.(type) {
+	case *rmq.StateAccepted:
+	default:
+		return fmt.Errorf("Unexpected publish outcome: %v", res.Outcome)
+	}
+
 	return nil
 }
