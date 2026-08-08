@@ -9,14 +9,6 @@ import (
 
 const ExchangeName string = "main"
 
-/*
-@todo: implement Close function
-
-defer pub.Close()
-
-- conn.Close()
-- publisher.Close()
-*/
 type Pubsub struct {
 	ctx  context.Context
 	conn *rmq.AmqpConnection
@@ -110,4 +102,9 @@ func (p *Pubsub) Dispatch(event Event) error {
 	}
 
 	return nil
+}
+
+func (p *Pubsub) Close() {
+	_ = p.conn.Close(context.Background())
+	_ = p.bus.Close(context.Background())
 }
