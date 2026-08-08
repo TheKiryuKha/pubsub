@@ -92,7 +92,7 @@ func (p *Pubsub) RegisterHandlers(handlers ...Handler) error {
 		}
 
 		go func(consumer *rmq.Consumer, handler Handler) {
-			defer consumer.Close(context.Background())
+			defer consumer.Close(p.ctx)
 
 			for {
 				delivery, err := consumer.Receive(p.ctx)
@@ -101,6 +101,7 @@ func (p *Pubsub) RegisterHandlers(handlers ...Handler) error {
 						return
 					}
 					log.Printf("%v", err)
+					continue
 				}
 
 				msg := delivery.Message().Data[0]
@@ -108,12 +109,15 @@ func (p *Pubsub) RegisterHandlers(handlers ...Handler) error {
 
 				err = json.Unmarshal(msg, &event)
 				if err != nil {
+					// @todo: nice retries
 					delivery.Requeue(p.ctx)
+					continue
 				}
 
 				err = handler.Handle(event)
 				if err != nil {
 					delivery.Requeue(p.ctx)
+					continue
 				}
 
 				delivery.Accept(p.ctx)
