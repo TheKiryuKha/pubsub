@@ -90,7 +90,6 @@ func (p *Pubsub) RegisterHandlers(handlers ...Handler) error {
 		}
 
 		go func(consumer *rmq.Consumer) {
-			var event Event
 			defer consumer.Close(context.Background())
 
 			for {
@@ -103,6 +102,8 @@ func (p *Pubsub) RegisterHandlers(handlers ...Handler) error {
 				}
 
 				msg := delivery.Message().Data[0]
+				var event Event
+
 				err = json.Unmarshal(msg, &event)
 				if err != nil {
 					delivery.Requeue(p.ctx)
