@@ -2,7 +2,9 @@ package pubsub
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log"
 
 	rmq "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmqamqp"
 )
@@ -23,7 +25,7 @@ type Event struct {
 type Handler interface {
 	Queue() string
 	Events() []string
-	Handle(Event)
+	Handle(Event) error
 }
 
 func New(ctx context.Context, address string) (*Pubsub, error) {
@@ -59,6 +61,7 @@ This thing should:
 */
 func (p *Pubsub) RegisterHandlers(handlers ...Handler) error {
 	for _, handler := range handlers {
+		// create queue
 		qInfo, err := p.conn.Management().DeclareQueue(
 			p.ctx,
 			&rmq.QuorumQueueSpecification{Name: handler.Queue()},
@@ -67,6 +70,7 @@ func (p *Pubsub) RegisterHandlers(handlers ...Handler) error {
 			return err
 		}
 
+		// bind routing keys to queue
 		for _, event := range handler.Events() {
 			_, err = p.conn.Management().Bind(p.ctx, &rmq.ExchangeToQueueBindingSpecification{
 				SourceExchange:   ExchangeName,
@@ -77,6 +81,36 @@ func (p *Pubsub) RegisterHandlers(handlers ...Handler) error {
 				return err
 			}
 		}
+
+		// run consumer
+		consumer, err := p.conn.NewConsumer(p.ctx, qInfo.Name(), nil)
+		if err != nil {
+			return err
+		}
+
+		go func(consumer *rmq.Consumer) {
+			defer consumer.Close(context.Background())
+
+			for {
+				delivery, err := consumer.Receive(p.ctx)
+				if err != nil {
+					if errors.Is(err, context.Canceled) {
+						return
+					}
+					log.Panicf("%v", err)
+				}
+				msg := string(delivery.Message().Data[0])
+
+				event := Event{Message: msg, Type: "test_type"}
+
+				err = handler.Handle(event)
+				if err != nil {
+					delivery.Requeue(p.ctx)
+				}
+
+				delivery.Accept(p.ctx)
+			}
+		}(consumer)
 	}
 	return nil
 }
