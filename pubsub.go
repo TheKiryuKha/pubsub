@@ -42,10 +42,19 @@ func New(ctx context.Context, address string) (*Pubsub, error) {
 /*
 This thing should:
 
+- create an echange
 - create neccessary queues
 - register recievers as handlers(idk, LOL)
 */
 func (p *Pubsub) RegisterHandlers(handlers ...Handler) error {
+	_, err := p.conn.Management().DeclareExchange(
+		p.ctx,
+		&rmq.DirectExchangeSpecification{Name: "main"},
+	)
+	if err != nil {
+		return err
+	}
+
 	for _, handler := range handlers {
 		_, err := p.conn.Management().DeclareQueue(
 			p.ctx,
