@@ -2,6 +2,7 @@ package pubsub
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -18,8 +19,8 @@ type Pubsub struct {
 }
 
 type Event struct {
-	Type    string
-	Message string
+	Type    string         `json:"type"`
+	Payload map[string]any `json:"payload"`
 }
 
 type Handler interface {
@@ -89,6 +90,7 @@ func (p *Pubsub) RegisterHandlers(handlers ...Handler) error {
 		}
 
 		go func(consumer *rmq.Consumer) {
+			var event Event
 			defer consumer.Close(context.Background())
 
 			for {
@@ -99,9 +101,12 @@ func (p *Pubsub) RegisterHandlers(handlers ...Handler) error {
 					}
 					log.Panicf("%v", err)
 				}
-				msg := string(delivery.Message().Data[0])
 
-				event := Event{Message: msg, Type: "test_type"}
+				msg := delivery.Message().Data[0]
+				err = json.Unmarshal(msg, &event)
+				if err != nil {
+					delivery.Requeue(p.ctx)
+				}
 
 				err = handler.Handle(event)
 				if err != nil {
@@ -116,8 +121,13 @@ func (p *Pubsub) RegisterHandlers(handlers ...Handler) error {
 }
 
 func (p *Pubsub) Dispatch(event Event) error {
+	payload, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+
 	msg, err := rmq.NewMessageWithAddress(
-		[]byte(event.Message),
+		payload,
 		&rmq.ExchangeAddress{Exchange: ExchangeName, Key: event.Type},
 	)
 	if err != nil {
