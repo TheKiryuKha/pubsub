@@ -6,6 +6,8 @@ import (
 	rmq "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmqamqp"
 )
 
+const ExchangeName string = "main"
+
 /*
 @todo: implement Close function
 
@@ -25,6 +27,7 @@ type Message struct {
 
 type Handler interface {
 	Queue() string
+	Events() []string
 	Handle(Message)
 }
 
@@ -49,20 +52,30 @@ This thing should:
 func (p *Pubsub) RegisterHandlers(handlers ...Handler) error {
 	_, err := p.conn.Management().DeclareExchange(
 		p.ctx,
-		&rmq.DirectExchangeSpecification{Name: "main"},
+		&rmq.DirectExchangeSpecification{Name: ExchangeName},
 	)
 	if err != nil {
 		return err
 	}
 
 	for _, handler := range handlers {
-		_, err := p.conn.Management().DeclareQueue(
+		qInfo, err := p.conn.Management().DeclareQueue(
 			p.ctx,
 			&rmq.QuorumQueueSpecification{Name: handler.Queue()},
 		)
-
 		if err != nil {
 			return err
+		}
+
+		for _, event := range handler.Events() {
+			_, err = p.conn.Management().Bind(p.ctx, &rmq.ExchangeToQueueBindingSpecification{
+				SourceExchange:   ExchangeName,
+				DestinationQueue: qInfo.Name(),
+				BindingKey:       event,
+			})
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
