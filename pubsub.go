@@ -98,7 +98,7 @@ func (p *Pubsub) RegisterHandlers(handlers ...Handler) error {
 					if errors.Is(err, context.Canceled) {
 						return
 					}
-					log.Panicf("%v", err)
+					log.Printf("%v", err)
 				}
 
 				msg := delivery.Message().Data[0]
