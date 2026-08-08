@@ -21,14 +21,14 @@ type Pubsub struct {
 	ctx  context.Context
 }
 
-type Message struct {
+type Event struct {
 	Message string
 }
 
 type Handler interface {
 	Queue() string
 	Events() []string
-	Handle(Message)
+	Handle(Event)
 }
 
 func New(ctx context.Context, address string) (*Pubsub, error) {
