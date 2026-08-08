@@ -1,5 +1,7 @@
 package pubsub
 
+// @todo: nice error handling and loggin
+
 import (
 	"context"
 	"encoding/json"
@@ -34,7 +36,7 @@ func New(ctx context.Context, address string) (*Pubsub, error) {
 
 	conn, err := env.NewConnection(ctx)
 	if err != nil {
-		return &Pubsub{}, err
+		return nil, err
 	}
 
 	_, err = conn.Management().DeclareExchange(
@@ -42,12 +44,12 @@ func New(ctx context.Context, address string) (*Pubsub, error) {
 		&rmq.DirectExchangeSpecification{Name: ExchangeName},
 	)
 	if err != nil {
-		return &Pubsub{}, err
+		return nil, err
 	}
 
 	publisher, err := conn.NewPublisher(ctx, nil, nil)
 	if err != nil {
-		return &Pubsub{}, err
+		return nil, err
 	}
 
 	return &Pubsub{ctx: ctx, conn: conn, bus: publisher}, nil
