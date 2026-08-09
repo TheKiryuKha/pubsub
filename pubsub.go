@@ -60,11 +60,8 @@ func New(ctx context.Context, address string) (*Pubsub, error) {
 }
 
 /*
-This thing should:
-
-- create an echange
-- create neccessary queues
-- register recievers as handlers(idk, LOL)
+IMPORTANT!
+This function must be called only once in the programm
 */
 func (p *Pubsub) RegisterHandlers(ctx context.Context, handlers ...Handler) error {
 	consumerCtx, cancel := context.WithCancel(ctx)
