@@ -15,7 +15,6 @@ import (
 const ExchangeName string = "main"
 
 type Pubsub struct {
-	ctx  context.Context
 	conn *rmq.AmqpConnection
 	bus  *rmq.Publisher
 }
@@ -52,7 +51,7 @@ func New(ctx context.Context, address string) (*Pubsub, error) {
 		return nil, err
 	}
 
-	return &Pubsub{ctx: ctx, conn: conn, bus: publisher}, nil
+	return &Pubsub{conn: conn, bus: publisher}, nil
 }
 
 /*
@@ -62,11 +61,11 @@ This thing should:
 - create neccessary queues
 - register recievers as handlers(idk, LOL)
 */
-func (p *Pubsub) RegisterHandlers(handlers ...Handler) error {
+func (p *Pubsub) RegisterHandlers(ctx context.Context, handlers ...Handler) error {
 	for _, handler := range handlers {
 		// create queue
 		qInfo, err := p.conn.Management().DeclareQueue(
-			p.ctx,
+			ctx,
 			&rmq.QuorumQueueSpecification{Name: handler.Queue()},
 		)
 		if err != nil {
@@ -75,7 +74,7 @@ func (p *Pubsub) RegisterHandlers(handlers ...Handler) error {
 
 		// bind routing keys to queue
 		for _, event := range handler.Events() {
-			_, err = p.conn.Management().Bind(p.ctx, &rmq.ExchangeToQueueBindingSpecification{
+			_, err = p.conn.Management().Bind(ctx, &rmq.ExchangeToQueueBindingSpecification{
 				SourceExchange:   ExchangeName,
 				DestinationQueue: qInfo.Name(),
 				BindingKey:       event,
@@ -86,16 +85,16 @@ func (p *Pubsub) RegisterHandlers(handlers ...Handler) error {
 		}
 
 		// run consumer
-		consumer, err := p.conn.NewConsumer(p.ctx, qInfo.Name(), nil)
+		consumer, err := p.conn.NewConsumer(ctx, qInfo.Name(), nil)
 		if err != nil {
 			return err
 		}
 
 		go func(consumer *rmq.Consumer, handler Handler) {
-			defer consumer.Close(p.ctx)
+			defer consumer.Close(ctx)
 
 			for {
-				delivery, err := consumer.Receive(p.ctx)
+				delivery, err := consumer.Receive(ctx)
 				if err != nil {
 					if errors.Is(err, context.Canceled) {
 						return
@@ -110,24 +109,24 @@ func (p *Pubsub) RegisterHandlers(handlers ...Handler) error {
 				err = json.Unmarshal(msg, &event)
 				if err != nil {
 					// @todo: nice retries
-					delivery.Requeue(p.ctx)
+					delivery.Requeue(ctx)
 					continue
 				}
 
 				err = handler.Handle(event)
 				if err != nil {
-					delivery.Requeue(p.ctx)
+					delivery.Requeue(ctx)
 					continue
 				}
 
-				delivery.Accept(p.ctx)
+				delivery.Accept(ctx)
 			}
 		}(consumer, handler)
 	}
 	return nil
 }
 
-func (p *Pubsub) Dispatch(event Event) error {
+func (p *Pubsub) Dispatch(ctx context.Context, event Event) error {
 	payload, err := json.Marshal(event)
 	if err != nil {
 		return err
@@ -141,7 +140,7 @@ func (p *Pubsub) Dispatch(event Event) error {
 		return err
 	}
 
-	res, err := p.bus.Publish(p.ctx, msg)
+	res, err := p.bus.Publish(ctx, msg)
 	if err != nil {
 		return err
 	}
@@ -155,7 +154,7 @@ func (p *Pubsub) Dispatch(event Event) error {
 	return nil
 }
 
-func (p *Pubsub) Close() {
-	_ = p.bus.Close(context.Background())
-	_ = p.conn.Close(context.Background())
+func (p *Pubsub) Close(ctx context.Context) {
+	_ = p.bus.Close(ctx)
+	_ = p.conn.Close(ctx)
 }
