@@ -181,7 +181,7 @@ func (p *Pubsub) Dispatch(ctx context.Context, event Event) error {
 	switch res.Outcome.(type) {
 	case *rmq.StateAccepted:
 	default:
-		return fmt.Errorf("Unexpected publish outcome: %v", res.Outcome)
+		return fmt.Errorf("unexpected publish outcome: %v", res.Outcome)
 	}
 
 	return nil
@@ -196,11 +196,11 @@ func (p *Pubsub) Close(ctx context.Context) error {
 	}
 
 	if err := p.bus.Close(ctx); err != nil {
-		errs = append(errs, fmt.Errorf("Failed to close publisher, %v", err))
+		errs = append(errs, fmt.Errorf("failed to close publisher, %w", err))
 	}
 
 	if err := p.conn.Close(ctx); err != nil {
-		errs = append(errs, fmt.Errorf("Failed to close connection, %v", err))
+		errs = append(errs, fmt.Errorf("failed to close connection, %v", err))
 	}
 
 	return errors.Join(errs...)
