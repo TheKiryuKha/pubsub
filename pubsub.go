@@ -132,13 +132,11 @@ func (p *Pubsub) RegisterHandlers(ctx context.Context, handlers ...Handler) erro
 				err = json.Unmarshal(msg, &event)
 				if err != nil {
 					// @todo: nice retries
-					delivery.Requeue(ctx)
 					continue
 				}
 
 				err = handler.Handle(ctx, event)
 				if err != nil {
-					delivery.Requeue(ctx)
 					continue
 				}
 
@@ -200,7 +198,7 @@ func (p *Pubsub) Close(ctx context.Context) error {
 	}
 
 	if err := p.conn.Close(ctx); err != nil {
-		errs = append(errs, fmt.Errorf("failed to close connection, %v", err))
+		errs = append(errs, fmt.Errorf("failed to close connection, %w", err))
 	}
 
 	return errors.Join(errs...)
